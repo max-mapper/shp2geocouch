@@ -1,0 +1,69 @@
+#!/usr/bin/env ruby
+require 'httparty'
+require 'couchrest'
+require 'optparse'
+
+class ShapefileToGeoCouch
+  attr_accessor :filename, :database_url
+  
+  def initialize
+    db = CouchRest.database! database_url
+  end
+
+  def shapefile
+    @filename + '.shp'
+  end
+  
+  def json
+    @filename + '.json'
+  end
+  
+  def bulk
+    @filename + '_bulk.json'
+  end
+  
+  def database_url
+    'http://localhost:5984/' + @filename
+  end
+
+  def convert
+    puts "Converting Shapefile to #{json}..."
+    `ogr2ogr -t_srs EPSG:4326 -a_srs EPSG:4326 -f "GeoJSON" #{json} #{shapefile}`
+    puts "Reformatting json for output to #{json}..."
+    system("sed -e '/^\"type\": \"FeatureCollection\",$/d' -e '/^\"features\": \\[$/d' -e '/^{$/d' -e '/^,$/d' -e '/^}$/d' -e '/^]$/d' -e '/^$/d' -e 's/$/,/' #{json} > #{bulk}")
+  end
+  
+  def upload
+    File.open(bulk).each_line do |line|
+       HTTParty.post(database_url + '/`_bulk_docs`', :body => '{"docs": [' + line[0..-3] + "]}", :headers => {'content-type' => "application/json"})
+     end
+  end
+  
+  def add_ddoc
+    view_exists = db.get('_design/geojson') rescue false
+    unless view_exists
+      db.save_doc({
+        "_id" => "_design/geojson",
+        "spatial" => {
+          :points => "function(doc) { emit(doc.geometry, {id: doc._id, geometry: doc.geometry}) };"
+        }
+      })
+    end
+  end
+end  
+
+
+options = { :count => 1 }
+OptionParser.new do |opts|
+  opts.banner = "Usage #{__FILE__} [options]"
+  opts.on("-c N", "--count N", "?") do |count|
+    options[:count] = count.to_i
+  end
+
+  opts.on_tail("-h", "--help", "Show this message") do
+    puts opts
+    exit
+  end
+end.parse!
+
+converter = ShapefileToGeoCouch.new
