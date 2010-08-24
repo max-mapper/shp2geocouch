@@ -4,10 +4,27 @@ require 'couchrest'
 require 'optparse'
 
 class ShapefileToGeoCouch
-  attr_accessor :filename, :database_url
+  attr_accessor :filename, :couch_url
   
   def initialize
-    db = CouchRest.database! database_url
+    @db = CouchRest.database! @couch_url
+    verify_dependencies
+    convert
+    upload
+    add_ddoc
+  end
+  
+  def verify_dependencies
+    %w(ogr2ogr sed).each do |dependency|
+      unless system("which #{dependency}")
+        raise "#{dependency} isn't installed or isn't in your current path."
+      end
+    end
+    begin
+      @db.get('_all_dbs')
+    rescue Errno::ECONNREFUSED
+      raise "Couldnt find a Couch instance running at #{@couch_url}"
+    end
   end
 
   def shapefile
@@ -27,9 +44,9 @@ class ShapefileToGeoCouch
   end
 
   def convert
-    puts "Converting Shapefile to #{json}..."
+    puts "Converting Shapefile, saving as #{json}..."
     `ogr2ogr -t_srs EPSG:4326 -a_srs EPSG:4326 -f "GeoJSON" #{json} #{shapefile}`
-    puts "Reformatting json for output to #{json}..."
+    puts "Reformatting json for bulk import, saving as #{bulk}..."
     system("sed -e '/^\"type\": \"FeatureCollection\",$/d' -e '/^\"features\": \\[$/d' -e '/^{$/d' -e '/^,$/d' -e '/^}$/d' -e '/^]$/d' -e '/^$/d' -e 's/$/,/' #{json} > #{bulk}")
   end
   
@@ -52,18 +69,12 @@ class ShapefileToGeoCouch
   end
 end  
 
+raise "You must specify a Shapefile to convert." if ARGV[0].nil?
+options = {:filename => ARGV[0]}
+options[:couch_url] = ARGV[1] || "http://localhost:5984"
 
-options = { :count => 1 }
 OptionParser.new do |opts|
-  opts.banner = "Usage #{__FILE__} [options]"
-  opts.on("-c N", "--count N", "?") do |count|
-    options[:count] = count.to_i
-  end
-
-  opts.on_tail("-h", "--help", "Show this message") do
-    puts opts
-    exit
-  end
+  opts.banner = "Usage: #{__FILE__} [path-to-shapefile] [your-geocouch-root-url (optional, default: http://localhost:5984)]"
 end.parse!
 
-converter = ShapefileToGeoCouch.new
+# converter = ShapefileToGeoCouch.new(options)
