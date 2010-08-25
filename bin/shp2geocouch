@@ -4,7 +4,7 @@ require 'couchrest'
 require 'optparse'
 
 class ShapefileToGeoCouch
-  attr_accessor :filename, :extension, :couch_url, :cleanup
+  attr_accessor :pwd, :filename, :extension, :couch_url, :cleanup
   
   def initialize(options)
     set_accessors(options)
@@ -39,11 +39,11 @@ class ShapefileToGeoCouch
   end
   
   def absolute_path
-    File.expand_path(@filename, Dir.pwd)
+    File.expand_path(@absolute, Dir.pwd)
   end
 
   def shapefile
-    "#{output_folder}/#{@filename}.shp"
+    Dir.glob(absolute_path + "/**/*.shp")[0]
   end
   
   def json
@@ -60,8 +60,8 @@ class ShapefileToGeoCouch
   
   def unzip
     puts "Unzipping into #{output_folder}..."
-    %x!mkdir -p #{output_folder}!
-    %x!unzip #{filename}.zip -d #{output_folder}!
+    `mkdir -p #{output_folder}`
+    `unzip #{@absolute}.zip -d #{output_folder}`
   end
 
   def convert
@@ -69,7 +69,7 @@ class ShapefileToGeoCouch
     puts "Converting Shapefile, saving as #{json}..."
     %x!ogr2ogr -t_srs EPSG:4326 -a_srs EPSG:4326 -f "GeoJSON" #{json} #{shapefile}!
     puts "Reformatting json for bulk import, saving as #{bulk}..."
-    %x!sed -e '/^\"type\": \"FeatureCollection\",$/d' -e '/^\"features\": \\[$/d' -e '/^{$/d' -e '/^,$/d' -e '/^}$/d' -e '/^]$/d' -e '/^$/d' -e 's/$/,/' #{json} > #{bulk}"!
+    %x!sed -e '/^"type": "FeatureCollection",$/d' -e '/^"features": \\[$/d' -e '/^{$/d' -e '/^,$/d' -e '/^}$/d' -e '/^]$/d' -e '/^$/d' -e 's/$/,/' #{json} > #{bulk}"!
   end
   
   def upload
@@ -104,9 +104,11 @@ OptionParser.new do |opts|
 end.parse!
 
 raise "You must specify a Shapefile to convert." if ARGV[0].nil? 
-filename, extension = ARGV[0].split('.')
+path, extension = ARGV[0].split('.')
+filename = path.split('/')[-1]
+pwd = path.split('/')[1..-1].join('/')
 raise "You must specify a .shp or a .zip" unless extension =~ /zip|shp/i
-options = {:filename => filename, :extension => extension}.merge(defaults)
+options = {:pwd => pwd, :filename => filename, :extension => extension}.merge(defaults)
 options[:couch_url] = ARGV[1] || "http://localhost:5984"
 
 converter = ShapefileToGeoCouch.new(options)
