@@ -4,16 +4,17 @@ require 'couchrest'
 require 'optparse'
 
 class ShapefileToGeoCouch
-  attr_accessor :pwd, :filename, :extension, :couch_url, :cleanup
+  attr_accessor :path, :extension, :name, :couch_url, :cleanup, :verbose
   
   def initialize(options)
     set_accessors(options)
-    @db = CouchRest.database! "#{@couch_url}/#{filename}"
-    # verify_dependencies
+    @db = CouchRest.database! database_url
+    verify_dependencies
     convert
-    # upload
-    # add_ddoc
+    upload
+    add_ddoc
     cleanup if @cleanup
+    puts "Upload complete. Test your data at #{database_url}/_design/geojson/_spatial/points?bbox=-180,180,-90,90" if @verbose
   end
   
   def set_accessors(options)
@@ -22,66 +23,68 @@ class ShapefileToGeoCouch
   
   def verify_dependencies
     %w(ogr2ogr sed).each do |dependency|
-      found = %x!which #{dependency}!
-      if found.empty?
+      unless %x!which #{dependency}![dependency]
         raise "#{dependency} isn't installed or isn't in your current path."
       end
     end
     begin
-      @db.get('/')
+      @db.get("")
     rescue Errno::ECONNREFUSED
       raise "Couldnt find a Couch instance running at #{@couch_url}"
     end
   end
+  
+  def database_url
+    "#{@couch_url}/#{@name}"
+  end
 
   def output_folder
-    File.expand_path("#{@filename}_converted", absolute_path)
+    File.expand_path("#{@name}_converted", Dir.pwd)
   end
   
-  def absolute_path
-    File.expand_path(@absolute, Dir.pwd)
-  end
-
-  def shapefile
-    Dir.glob(absolute_path + "/**/*.shp")[0]
+  def find_shapefile
+    Dir.glob(output_folder + "/**/*.shp")[0]
   end
   
   def json
-    "#{output_folder}/#{@filename}.json"
+    "#{output_folder}/#{@name}.json"
   end
   
   def bulk
-    "#{output_folder}/#{@filename}_bulk.json"
-  end
-  
-  def database_url
-    'http://localhost:5984/' + @filename
+    "#{output_folder}/#{@name}_bulk.json"
   end
   
   def unzip
-    puts "Unzipping into #{output_folder}..."
-    `mkdir -p #{output_folder}`
-    `unzip #{@absolute}.zip -d #{output_folder}`
+    puts "Unzipping into #{output_folder}..." if @verbose
+    `unzip #{@path} -d #{output_folder}`
   end
 
   def convert
-    unzip if @extension =~ /zip/i
-    puts "Converting Shapefile, saving as #{json}..."
+    `mkdir -p #{output_folder}`
+    if @extension =~ /zip/i
+      unzip
+      shapefile = find_shapefile
+    else
+      shapefile = @path
+    end
+    puts "Converting Shapefile, saving as #{json}..." if @verbose
     %x!ogr2ogr -t_srs EPSG:4326 -a_srs EPSG:4326 -f "GeoJSON" #{json} #{shapefile}!
-    puts "Reformatting json for bulk import, saving as #{bulk}..."
-    %x!sed -e '/^"type": "FeatureCollection",$/d' -e '/^"features": \\[$/d' -e '/^{$/d' -e '/^,$/d' -e '/^}$/d' -e '/^]$/d' -e '/^$/d' -e 's/$/,/' #{json} > #{bulk}"!
+    puts "Reformatting json for bulk import, saving as #{bulk}..." if @verbose
+    %x!sed -e '/^\"type\": \"FeatureCollection\",$/d' -e '/^\"features\": \\[$/d' -e '/^{$/d' -e '/^,$/d' -e '/^}$/d' -e '/^]$/d' -e '/^$/d' -e 's/$/,/' #{json} > #{bulk}!
   end
   
   def upload
+    puts "Bulk loading data into GeoCouch... view progress at #{@couch_url}/_utils" if @verbose
     File.open(bulk).each_line do |line|
-       HTTParty.post(database_url + '/_bulk_docs', :body => '{"docs": [' + line[0..-3] + "]}", :headers => {'content-type' => "application/json"})
+      HTTParty.post(database_url + '/_bulk_docs', :body => '{"docs": [' + line[0..-3] + "]}", :headers => {'content-type' => "application/json"})
      end
   end
   
   def add_ddoc
-    view_exists = db.get('_design/geojson') rescue false
+    puts "Adding spatial index design document..." if @verbose
+    view_exists = @db.get('_design/geojson') rescue false
     unless view_exists
-      db.save_doc({
+      @db.save_doc({
         "_id" => "_design/geojson",
         "spatial" => {
           :points => "function(doc) { emit(doc.geometry, {id: doc._id, geometry: doc.geometry}) };"
@@ -91,24 +94,31 @@ class ShapefileToGeoCouch
   end
   
   def cleanup
+    puts "Cleaning up..." if @verbose
     %x!rm -rf #{output_folder}!
   end
 end  
 
-defaults = {:cleanup => true}
+defaults = {:cleanup => true, :verbose => false}
 OptionParser.new do |opts|
   opts.banner = "Usage: #{__FILE__} [path-to-shapefile] [your-geocouch-root-url (optional, default: http://localhost:5984)]"
   opts.on("--no-cleanup", "Don't remove converted files after upload") do |v|
     defaults[:cleanup] = false
   end
+  
+  opts.on('-v') do |v|
+    defaults[:verbose] = true
+  end
 end.parse!
 
-raise "You must specify a Shapefile to convert." if ARGV[0].nil? 
-path, extension = ARGV[0].split('.')
-filename = path.split('/')[-1]
-pwd = path.split('/')[1..-1].join('/')
+raise "You must specify a Shapefile to convert." if ARGV[0].nil?
+
+extension = ARGV[0].split('.')[1]
 raise "You must specify a .shp or a .zip" unless extension =~ /zip|shp/i
-options = {:pwd => pwd, :filename => filename, :extension => extension}.merge(defaults)
+
+name = ARGV[0].split('/')[-1].split('.')[0]
+
+options = {:path => ARGV[0], :name => name.downcase, :extension => extension}.merge(defaults)
 options[:couch_url] = ARGV[1] || "http://localhost:5984"
 
-converter = ShapefileToGeoCouch.new(options)
+ShapefileToGeoCouch.new(options)
