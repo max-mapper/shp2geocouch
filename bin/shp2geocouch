@@ -22,7 +22,7 @@ class ShapefileToGeoCouch
   end
   
   def verify_dependencies
-    %w(ogr2ogr sed).each do |dependency|
+    %w(ogr2ogr sed unzip).each do |dependency|
       unless %x!which #{dependency}![dependency]
         raise "#{dependency} isn't installed or isn't in your current path."
       end
