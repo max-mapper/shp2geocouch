@@ -2,6 +2,7 @@
 require 'httparty'
 require 'couchrest'
 require 'optparse'
+require 'iconv'
 
 class ShapefileToGeoCouch
   attr_accessor :path, :extension, :name, :couch_url, :cleanup, :verbose
@@ -74,9 +75,11 @@ class ShapefileToGeoCouch
   end
   
   def upload
+    ic = Iconv.new('UTF-8//IGNORE', 'UTF-8') # disregard all UTF8 characters
     puts "Bulk loading data into GeoCouch... view progress at #{@couch_url}/_utils" if @verbose
     File.open(bulk).each_line do |line|
-      HTTParty.post(database_url + '/_bulk_docs', :body => '{"docs": [' + line[0..-3] + "]}", :headers => {'content-type' => "application/json"})
+      valid_string = ic.iconv(line[0..-3] + '  ')[0..-3] # http://po-ru.com/diary/fixing-invalid-utf-8-in-ruby-revisited/
+      HTTParty.post(database_url + '/_bulk_docs', :body => '{"docs": [' + valid_string + "]}", :headers => {'content-type' => "application/json"})
      end
   end
   

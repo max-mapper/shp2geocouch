@@ -10,6 +10,8 @@ begin
     gem.email = "max@maxogden.com"
     gem.homepage = "http://github.com/maxogden/shp2geocouch"
     gem.authors = ["Max Ogden"]
+    gem.add_dependency 'httparty'
+    gem.add_dependency 'couchrest'
   end
   Jeweler::GemcutterTasks.new
 rescue LoadError

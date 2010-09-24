@@ -4,7 +4,7 @@ This is an executable rubygem that creates "GeoCouch":http://www.github.com/vmx/
 
 h2. Installation
 
-You will need access to a GeoCouch server. For instructions on setting up your own local GeoCouch, check out "my related blog post":http://maxogden.com.
+You will need access to a GeoCouch server. For instructions on setting up your own local GeoCouch, check out "my related blog post":http://maxogden.com/#/2010-08-14-loading-shapefiles-into-geocouch.html.
 
 Install dependencies:
 @unzip@, @sed@, @ogr2ogr@
@@ -12,6 +12,10 @@ Install dependencies:
 If you are on Mac OS X, you will already have @unzip@ and @sed@ installed. To get @ogr2ogr@, install "Homebrew":http://github.com/mxcl/homebrew and run @brew install gdal@.
 
 Note: @ogr2ogr@ is usually included with the @gdal@ package (sometimes called @gdal-bin@).
+
+@shp2geocouch@ depends on the following gems:
+* @httparty@ for sending data to CouchDB
+* @couchrest@ for interacting with CouchDB
 
 Install the @shp2geocouch@ gem:
 
