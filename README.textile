@@ -23,10 +23,10 @@ Install the @shp2geocouch@ gem:
 
 h2. Usage
 
-@shp2geocouch <path_to_shapefile> [your-geocouch-root-url (optional, default: http://localhost:5984)]@
+@shp2geocouch <path_to_shapefile> [geocouch-url (optional, default: http://localhost:5984/zip_filename)]@
 
 example: @shp2geocouch /sweet_geo_data/Portland_Oregon_Public_Libraries.shp@
-another possible example: @shp2geocouch /zipped_shapfiles/US_Railroads.zip http://myusername.couchone.com@
+another possible example: @shp2geocouch /zipped_shapfiles/US_Railroads.zip http://myusername.couchone.com/us_railroads@
 
 Once completed, you can run bounding box queries against your data! Visit the following link to receive a dump of your entire dataset as GeoJSON (a bounding box that covers the entire planet):
 @http://localhost:5984/your_db_name/_design/geojson/_spatial/points?bbox=-180,180,-90,90@
