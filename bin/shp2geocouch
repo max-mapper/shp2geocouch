@@ -9,7 +9,7 @@ class ShapefileToGeoCouch
   
   def initialize(options)
     set_accessors(options)
-    @db = CouchRest.database! database_url
+    @db = CouchRest.database! @couch_url
     verify_dependencies
     convert
     upload
@@ -28,15 +28,10 @@ class ShapefileToGeoCouch
         raise "#{dependency} isn't installed or isn't in your current path."
       end
     end
-    begin
-      @db.get("")
-    rescue Errno::ECONNREFUSED
-      raise "Couldnt find a Couch instance running at #{@couch_url}"
-    end
   end
   
   def database_url
-    "#{@couch_url}/#{@name}"
+    @couch_url
   end
 
   def output_folder
@@ -104,7 +99,7 @@ end
 
 defaults = {:cleanup => true, :verbose => false}
 OptionParser.new do |opts|
-  opts.banner = "Usage: #{__FILE__} [path-to-shapefile] [your-geocouch-root-url (optional, default: http://localhost:5984)]"
+  opts.banner = "Usage: #{__FILE__} [path-to-shapefile] [your-geocouch-url (optional, default: http://localhost:5984/zip_filename)]"
   opts.on("--no-cleanup", "Don't remove converted files after upload") do |v|
     defaults[:cleanup] = false
   end
@@ -122,6 +117,6 @@ raise "You must specify a .shp or a .zip" unless extension =~ /zip|shp/i
 name = ARGV[0].split('/')[-1].split('.')[0]
 
 options = {:path => ARGV[0], :name => name.downcase, :extension => extension}.merge(defaults)
-options[:couch_url] = ARGV[1] || "http://localhost:5984"
+options[:couch_url] = ARGV[1] || "http://localhost:5984/#{name.downcase}"
 
 ShapefileToGeoCouch.new(options)
