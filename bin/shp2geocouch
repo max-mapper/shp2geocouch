@@ -5,7 +5,7 @@ require 'optparse'
 require 'iconv'
 
 class ShapefileToGeoCouch
-  attr_accessor :path, :extension, :name, :couch_url, :cleanup, :verbose
+  attr_accessor :path, :extension, :name, :couch_url, :cleanup, :verbose, :chunksize
   
   def initialize(options)
     set_accessors(options)
@@ -69,13 +69,29 @@ class ShapefileToGeoCouch
     %x!sed -e '/^\"type\": \"FeatureCollection\",$/d' -e '/^\"features\": \\[$/d' -e '/^{$/d' -e '/^,$/d' -e '/^}$/d' -e '/^]$/d' -e '/^$/d' -e 's/$/,/' #{json} > #{bulk}!
   end
   
-  def upload
+  def post(string)
     ic = Iconv.new('UTF-8//IGNORE', 'UTF-8') # disregard all UTF8 characters
+    valid_string = ic.iconv(string[0..-3] + '  ')[0..-3] # http://po-ru.com/diary/fixing-invalid-utf-8-in-ruby-revisited/
+    HTTParty.post(database_url + '/_bulk_docs', :body => '{"docs": [' + valid_string + "]}", :headers => {'content-type' => "application/json"})
+  end
+  
+  def upload
     puts "Bulk loading data into GeoCouch... view progress at #{@couch_url}/_utils" if @verbose
-    File.open(bulk).each_line do |line|
-      valid_string = ic.iconv(line[0..-3] + '  ')[0..-3] # http://po-ru.com/diary/fixing-invalid-utf-8-in-ruby-revisited/
-      HTTParty.post(database_url + '/_bulk_docs', :body => '{"docs": [' + valid_string + "]}", :headers => {'content-type' => "application/json"})
-     end
+    group = []
+    length = File.open(bulk).lines.count - 1
+    File.open(bulk).each_with_index do |line, index|
+      if (index % @chunksize == 0)
+        post(group.join(''))
+        group = [line]
+        next
+      end
+      if (index == length)
+        group << line
+        post(group.join(''))
+        next
+      end
+      group << line
+    end
   end
   
   def add_ddoc
@@ -97,11 +113,15 @@ class ShapefileToGeoCouch
   end
 end  
 
-defaults = {:cleanup => true, :verbose => false}
+defaults = {:cleanup => true, :verbose => false, :chunksize => 50}
 OptionParser.new do |opts|
   opts.banner = "Usage: #{__FILE__} [path-to-shapefile] [your-geocouch-url (optional, default: http://localhost:5984/zip_filename)]"
   opts.on("--no-cleanup", "Don't remove converted files after upload") do |v|
     defaults[:cleanup] = false
+  end
+  
+  opts.on("--chunksize [SIZE]", "Couch bulk docs interface lines per chunk PUT (default 50)") do |size|
+    defaults[:chunksize] = size.to_i
   end
   
   opts.on('-v') do |v|

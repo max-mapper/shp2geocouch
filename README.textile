@@ -26,7 +26,7 @@ h2. Usage
 @shp2geocouch <path_to_shapefile> [geocouch-url (optional, default: http://localhost:5984/zip_filename)]@
 
 example: @shp2geocouch /sweet_geo_data/Portland_Oregon_Public_Libraries.shp@
-another possible example: @shp2geocouch /zipped_shapfiles/US_Railroads.zip http://myusername.couchone.com/us_railroads@
+another possible example: @shp2geocouch /zipped_shapfiles/US_Railroads.zip http://myusername.couchone.com/railroads@
 
 Once completed, you can run bounding box queries against your data! Visit the following link to receive a dump of your entire dataset as GeoJSON (a bounding box that covers the entire planet):
 @http://localhost:5984/your_db_name/_design/geojson/_spatial/points?bbox=-180,180,-90,90@
@@ -38,6 +38,7 @@ h3. Arguments:
 * You can feed in either a @.shp@ file or a @.zip@ that contains a @.shp@
 * @-v@ for verbose
 * @--no-cleanup@ if you want @shp2geocouch@ to leave you a copy of unzipped Shapefile and converted JSON.
+* @--chunksize@ to customize the number of docs that it sends in each PUT to CouchDB's @_bulk_docs@ interface (default is 50)
 
 h2. What?
 
