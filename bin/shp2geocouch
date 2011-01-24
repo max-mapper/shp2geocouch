@@ -101,7 +101,7 @@ class ShapefileToGeoCouch
       @db.save_doc({
         "_id" => "_design/geojson",
         "spatial" => {
-          :points => "function(doc) { emit(doc.geometry, {id: doc._id, geometry: doc.geometry}) };"
+          :points => "function(doc) { if(doc.geometry){emit(doc.geometry, {id: doc._id, geometry: doc.geometry})} };"
         }
       })
     end
