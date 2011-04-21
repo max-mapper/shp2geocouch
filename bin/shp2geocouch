@@ -13,6 +13,7 @@ class ShapefileToGeoCouch
     set_accessors(options)
     @uri = parse_database_url
     @db = CouchRest.database! @database_url
+    @geocouch_utils = "http://max.iriscouch.com/apps"
     verify_dependencies
     convert
     upload
@@ -106,10 +107,10 @@ class ShapefileToGeoCouch
   def add_ddoc
     puts "Replicating http://github.com/maxogden/geocouch-utils..." if @verbose
     view_exists = @db.get('_design/geo') rescue false
-    internet_connection = HTTParty.get('http://localhost:5984') rescue false
+    internet_connection = HTTParty.get(@geocouch_utils) rescue false
     if !view_exists && internet_connection
       resp = HTTParty.post(couch_url + '/_replicate', 
-        :body => '{"source":"http://localhost:5984/catmapper","target":"' + @name + '", "doc_ids":["_design/geo"]}', 
+        :body => '{"source":' + @geocouch_utils + ',"target":"' + @name + '", "doc_ids":["_design/geo"]}', 
         :headers => {'content-type' => "application/json"}
       )
       resp = JSON.parse(resp)
