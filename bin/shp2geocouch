@@ -19,7 +19,6 @@ class ShapefileToGeoCouch
     upload
     add_ddoc
     cleanup if @cleanup
-    puts "Upload complete. Test your data at #{@database_url}/_design/geo/_spatial/full?bbox=-180,180,-90,90" if @verbose
   end
   
   def set_accessors(options)
@@ -85,7 +84,7 @@ class ShapefileToGeoCouch
   end
   
   def upload
-    puts "Bulk loading data into GeoCouch... view progress at #{@database_url}/_utils" if @verbose
+    puts "Bulk loading data into GeoCouch... view progress at #{couch_url}/_utils" if @verbose
     group = []
     length = File.open(bulk).lines.count - 1
     File.open(bulk).each_with_index do |line, index|
@@ -101,27 +100,35 @@ class ShapefileToGeoCouch
       end
       group << line
     end
+    puts "Shapefile upload complete. View data at #{couch_url}/_utils/database.html?#{@name}"
+  end
+  
+  def view_exists?
+    @db.get('_design/geo') rescue false
   end
   
   # replicates geocouch-utils into the db via http://max.iriscouch.com/apps/_design/geo
   def add_ddoc
-    puts "Replicating http://github.com/maxogden/geocouch-utils..." if @verbose
-    view_exists = @db.get('_design/geo') rescue false
     internet_connection = HTTParty.get(@geocouch_utils) rescue false
-    if !view_exists && internet_connection
-      resp = HTTParty.post(couch_url + '/_replicate', 
-        :body => '{"source":' + @geocouch_utils + ',"target":"' + @name + '", "doc_ids":["_design/geo"]}', 
-        :headers => {'content-type' => "application/json"}
-      )
-      resp = JSON.parse(resp)
-      if ((resp.keys.include? 'ok') && (resp['ok'] == true))
-        puts "View your data at #{@database_url}/_design/geo/_rewrite"
+    if internet_connection
+      if !view_exists?
+        puts "Replicating geocouch-utils + map browser from #{@geocouch_utils}..."
+        HTTParty.post(couch_url + '/_replicate', 
+          :body => '{"source":"' + @geocouch_utils + '","target":"' + @name + '", "doc_ids":["_design/geo"]}', 
+          :headers => {'content-type' => "application/json"}
+        ) rescue timeout = true
+        if timeout  
+          puts "Replication is taking a while. Check the status at #{couch_url}/_utils/status.html"
+          puts "Once it is done you can view a map of your data at #{@database_url}/_design/geo/_rewrite"
+        else
+          puts "View your data on a map at #{@database_url}/_design/geo/_rewrite"
+        end
       else
-        puts "View your data at http://#{couch_url}/_utils"
+        puts "geocouch-utils seems to already be installed in this database"
+        puts "There might be a map at #{@database_url}/_design/geo/_rewrite"
       end
-    elsif @verbose
-      puts "Did not push geocouch-utils -- either it already exists or internet is off"
-      puts "You can get geocouch-utils from http://github.com/maxogden/geocouch-utils"
+    else
+      puts "To view this data on a map see http://github.com/maxogden/geocouch-utils"
     end 
   end
   
