@@ -4,7 +4,9 @@ This is an executable rubygem that creates "GeoCouch":http://www.github.com/vmx/
 
 h2. Installation
 
-You will need access to a GeoCouch server. For instructions on setting up your own local GeoCouch, check out "my related blog post":http://maxogden.com/#/2010-08-14-loading-shapefiles-into-geocouch.html.
+This has been verified to work on Unix/MacOSX. Your mileage may vary if you are on Windows.
+
+You will need access to a GeoCouch server. For instructions on setting up your own local GeoCouch, check out "my related blog post":http://maxogden.com/#/blog/installing-geocouch. The easiest way to get GeoCouch is the "binary distribution from Couchbase":http://www.couchbase.com/downloads.
 
 Install dependencies:
 @unzip@, @sed@, @ogr2ogr@
@@ -26,10 +28,12 @@ h2. Usage
 @shp2geocouch <path_to_shapefile> [geocouch-url (optional, default: http://localhost:5984/zip_filename)]@
 
 example: @shp2geocouch /sweet_geo_data/Portland_Oregon_Public_Libraries.shp@
-another possible example: @shp2geocouch /zipped_shapfiles/US_Railroads.zip http://myusername.couchone.com/railroads@
+another possible example: @shp2geocouch /zipped_shapfiles/US_Railroads.zip http://admin:password@helloworld.couchone.com/railroads@
 
 Once completed, you can run bounding box queries against your data! Visit the following link to receive a dump of your entire dataset as GeoJSON (a bounding box that covers the entire planet):
-@http://localhost:5984/your_db_name/_design/geojson/_spatial/points?bbox=-180,-90,180,90@
+@http://localhost:5984/your_db_name/_design/geo/_spatial/ful?bbox=-180,-90,180,90@
+
+@shp2geocouch@ will try to install "geocouch-utils":http://github.com/maxogden/geocouch-utils into your database by replicating it from "my public couch":http://max.couchone.com/apps/_design/geo. @geocouch-utils@ includes a basic web based map browser that will allow you to view the data from your Shapefile.
 
 If you uploaded a large dataset, you may experience a delay on the first ever spatial query as GeoCouch builds it's spatial index. You can check the status of the indexer by visiting @http://localhost:5984/_utils/status.html@
 
