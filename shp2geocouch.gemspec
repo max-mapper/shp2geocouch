@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{shp2geocouch}
-  s.version = "0.0.7"
+  s.version = "0.0.8"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Max Ogden"]
-  s.date = %q{2011-04-21}
+  s.date = %q{2011-04-23}
   s.default_executable = %q{shp2geocouch}
   s.description = %q{rubygem that converts Shapefiles into GeoCouch databases}
   s.email = %q{max@maxogden.com}
@@ -24,7 +24,7 @@ Gem::Specification.new do |s|
     "Rakefile",
     "VERSION",
     "bin/shp2geocouch",
-    "pkg/shp2geocouch-0.0.7.gem",
+    "pkg/shp2geocouch-0.0.8.gem",
     "shp2geocouch.gemspec"
   ]
   s.homepage = %q{http://github.com/maxogden/shp2geocouch}
