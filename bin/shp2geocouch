@@ -12,6 +12,7 @@ class ShapefileToGeoCouch
   def initialize(options)
     set_accessors(options)
     @uri = parse_database_url
+    @name = @uri.path[1..-1]
     @db = CouchRest.database! @database_url
     @geocouch_utils = "http://max.iriscouch.com/apps"
     verify_dependencies
@@ -36,10 +37,12 @@ class ShapefileToGeoCouch
   def parse_database_url
     URI.parse(@database_url)
   end
-  
+
   def couch_url
     port = @uri.port && @uri.port != 80 ? ":#{@uri.port}" : ""
-    "#{@uri.scheme}://#{@uri.host}#{port}"
+    user = @uri.user ? "#{@uri.user}:" : ""
+    password = @uri.password ? "#{@uri.password}@" : ""
+    "#{@uri.scheme}://#{user}#{password}#{@uri.host}#{port}"
   end
 
   def output_folder
@@ -114,7 +117,7 @@ class ShapefileToGeoCouch
       if !view_exists?
         puts "Replicating geocouch-utils + map browser from #{@geocouch_utils}..."
         HTTParty.post(couch_url + '/_replicate', 
-          :body => '{"source":"' + @geocouch_utils + '","target":"' + @name + '", "doc_ids":["_design/geo"]}', 
+          :body => '{"source":"' + @geocouch_utils + '","target":"' + couch_url + "/" + @name + '", "doc_ids":["_design/geo"]}', 
           :headers => {'content-type' => "application/json"}
         ) rescue timeout = true
         if timeout  
@@ -161,7 +164,7 @@ raise "You must specify a .shp or a .zip" unless extension =~ /zip|shp/i
 
 name = ARGV[0].split('/')[-1].split('.')[0]
 
-options = {:path => ARGV[0], :name => name.downcase, :extension => extension}.merge(defaults)
+options = {:path => ARGV[0], :extension => extension}.merge(defaults)
 options[:database_url] = ARGV[1] || "http://localhost:5984/#{name.downcase}"
 
 ShapefileToGeoCouch.new(options)
