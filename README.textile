@@ -43,6 +43,7 @@ h3. Arguments:
 * @-v@ for verbose
 * @--no-cleanup@ if you want @shp2geocouch@ to leave you a copy of unzipped Shapefile and converted JSON.
 * @--chunksize@ to customize the number of docs that it sends in each PUT to CouchDB's @_bulk_docs@ interface (default is 50)
+* @-i@ to set the CouchDB IDs (_id) based on the given column in the Shapefile. The column is assumed to be unique; no error checking is performed.
 
 h2. What?
 
