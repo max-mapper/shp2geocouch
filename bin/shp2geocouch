@@ -103,6 +103,7 @@ class ShapefileToGeoCouch
       if @id
         # The slice is to get rid of ,\n at the end of the line
         parsedLine = JSON.parse(line[0...-2])
+        # Cast it to a string, so that Couch will take an integer id
         parsedLine['_id'] = parsedLine['properties'][@id].to_s
         line = parsedLine.to_json + ",\n"
         puts line
