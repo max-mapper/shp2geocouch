@@ -1,13 +1,16 @@
 #!/usr/bin/env ruby
+
+require 'rubygems'
 require 'httparty'
 require 'couchrest'
 require 'optparse'
 require 'iconv'
 require 'net/http'
 require 'uri'
+require 'json'
 
 class ShapefileToGeoCouch
-  attr_accessor :path, :extension, :name, :database_url, :cleanup, :verbose, :chunksize, :uri
+  attr_accessor :path, :extension, :name, :database_url, :cleanup, :verbose, :chunksize, :uri, :id
   
   def initialize(options)
     set_accessors(options)
@@ -78,6 +81,11 @@ class ShapefileToGeoCouch
     %x!ogr2ogr -t_srs EPSG:4326 -a_srs EPSG:4326 -f "GeoJSON" #{json} #{shapefile}!
     puts "Reformatting json for bulk import, saving as #{bulk}..." if @verbose
     %x!sed -e '/^\"type\": \"FeatureCollection\",$/d' -e '/^\"features\": \\[$/d' -e '/^{$/d' -e '/^,$/d' -e '/^}$/d' -e '/^]$/d' -e '/^$/d' -e 's/$/,/' #{json} > #{bulk}!
+
+    # the user wants to use a predefined ID field
+    if @id
+      puts "Inserting _id attributes based on col '#{id}'"   
+    end
   end
   
   def post(string)
@@ -90,7 +98,16 @@ class ShapefileToGeoCouch
     puts "Bulk loading data into GeoCouch... view progress at #{couch_url}/_utils" if @verbose
     group = []
     length = File.open(bulk).lines.count - 1
-    File.open(bulk).each_with_index do |line, index|
+    File.open(bulk).each_with_index do |line, index|      
+      # create an _id attr if requested
+      if @id
+        # The slice is to get rid of ,\n at the end of the line
+        parsedLine = JSON.parse(line[0...-2])
+        # Cast it to a string, so that Couch will take an integer id
+        parsedLine['_id'] = parsedLine['properties'][@id].to_s
+        line = parsedLine.to_json + ",\n"
+      end
+
       if (index % @chunksize == 0)
         post(group.join(''))
         group = [line]
@@ -155,11 +172,16 @@ OptionParser.new do |opts|
   opts.on('-v') do |v|
     defaults[:verbose] = true
   end
+
+  opts.on('-i [ID]', 'ID column to use for the database load') do |id|
+    defaults[:id] = id
+  end
 end.parse!
 
 raise "You must specify a Shapefile to convert." if ARGV[0].nil?
 
-extension = ARGV[0].split('.')[1]
+# Use -1, not 1, in case user has specified ../
+extension = ARGV[0].split('.')[-1]
 raise "You must specify a .shp or a .zip" unless extension =~ /zip|shp/i
 
 name = ARGV[0].split('/')[-1].split('.')[0]
