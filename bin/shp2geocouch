@@ -91,7 +91,8 @@ class ShapefileToGeoCouch
   def post(string)
     ic = Iconv.new('UTF-8//IGNORE', 'UTF-8') # disregard all UTF8 characters
     valid_string = ic.iconv(string[0..-3] + '  ')[0..-3] # http://po-ru.com/diary/fixing-invalid-utf-8-in-ruby-revisited/
-    HTTParty.post(@database_url + '/_bulk_docs', :body => '{"docs": [' + valid_string + "]}", :headers => {'content-type' => "application/json"})
+    body = '{"docs": [' + valid_string + ']}'
+    HTTParty.post(@database_url + '/_bulk_docs', :body => body, :headers => {'content-type' => "application/json"})
   end
   
   def upload
