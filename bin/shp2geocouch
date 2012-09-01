@@ -84,21 +84,28 @@ class ShapefileToGeoCouch
 
     # the user wants to use a predefined ID field
     if @id
-      puts "Inserting _id attributes based on col '#{id}'"   
+      puts "Inserting _id attributes based on col '#{id}'"
     end
   end
-  
+
   def post(string)
     ic = Iconv.new('UTF-8//IGNORE', 'UTF-8') # disregard all UTF8 characters
     valid_string = ic.iconv(string[0..-3] + '  ')[0..-3] # http://po-ru.com/diary/fixing-invalid-utf-8-in-ruby-revisited/
-    HTTParty.post(@database_url + '/_bulk_docs', :body => '{"docs": [' + valid_string + "]}", :headers => {'content-type' => "application/json"})
+    body = '{"docs": [' + valid_string + ']}'
+    HTTParty.post(@database_url + '/_bulk_docs', :body => body, :headers => {'content-type' => "application/json"})
   end
-  
+
   def upload
     puts "Bulk loading data into GeoCouch... view progress at #{couch_url}/_utils" if @verbose
     group = []
     length = File.open(bulk).lines.count - 1
-    File.open(bulk).each_with_index do |line, index|      
+    File.open(bulk).each_with_index do |line, index|
+      # check that the line is non-blank and not invalid JSON (e.g. rogue
+      # punctuation characters)
+      stripped_line = line.strip
+      if stripped_line.empty? or stripped_line == ","
+        next
+      end
       # create an _id attr if requested
       if @id
         # The slice is to get rid of ,\n at the end of the line
